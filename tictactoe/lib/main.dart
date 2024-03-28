@@ -23,7 +23,7 @@ class MyAppState extends State<MyApp> {
     return EasySplashScreen(
       logo: Image.asset('assets/screen.png'),
       title: const Text(
-        'Jonathan Crivaro\n\n\n\nTic Tac Toe\n\n\n\nFebruary 21, 2024',
+        'Jonathan Crivaro\n\n\n\nTic Tac Toe\n\n\n\nMarch 27, 2024',
         textAlign: TextAlign.center,
         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20.0),
       ),

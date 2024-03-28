@@ -1,27 +1,10 @@
-// ignore_for_file: constant_identifier_names
+// ignore_for_file: constant_identifier_names, non_constant_identifier_names
 
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
-
-void main() => runApp(const MyApp());
-
-class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
-// This widget is the root of your application.
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Stateless App Template',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: const HomePage(),
-    );
-  }
-}
+import 'dart:async';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -30,128 +13,160 @@ class HomePage extends StatefulWidget {
   HomePageState createState() => HomePageState();
 }
 
+enum Difficuty { EASY, MEDIUM, HARD }
+
 class HomePageState extends State<HomePage> {
   // Define Audio Players
-  final playerA = AudioPlayer();
-  final playerB = AudioPlayer();
+  String HUMAN_PLAYER = "X";
+  String COMPUTER_PLAYER = "O";
+  String label = ' ';
+  String _gameDif = 'EASY';
 
-  // Methods to play sound files
-  playLocalA() async {
-    await playerA.play(AssetSource('sword.mp3'));
+  var _gameDifficulty = 1;
+  Future _settings(BuildContext context, String message) async {
+    switch (await showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return SimpleDialog(
+            title: const Text('Select the Difficulty Level'),
+            children: <Widget>[
+              SimpleDialogOption(
+                child: const Text('Easy'),
+                onPressed: () {
+                  Navigator.pop(context, Difficuty.EASY);
+                },
+              ),
+              SimpleDialogOption(
+                child: const Text('Medium'),
+                onPressed: () {
+                  Navigator.pop(context, Difficuty.MEDIUM);
+                },
+              ),
+              SimpleDialogOption(
+                child: const Text('Hard'),
+                onPressed: () {
+                  Navigator.pop(context, Difficuty.HARD);
+                },
+              ),
+            ],
+          );
+        })) {
+      case Difficuty.EASY:
+        _gameDifficulty = 1;
+        _gameDif = 'EASY';
+        break;
+      case Difficuty.MEDIUM:
+        _gameDifficulty = 2;
+        _gameDif = 'MEDIUM';
+        break;
+      case Difficuty.HARD:
+        _gameDifficulty = 3;
+        _gameDif = 'HARD';
+        break;
+    }
+    print('The selection was Choice = $_gameDifficulty');
   }
 
-  playLocalB() async {
-    await playerB.play(AssetSource('swish.mp3'));
+  //other
+  void _aboutDialog(BuildContext context, String message) async {
+    await showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AboutDialog(
+            applicationIcon: Image.asset(
+              'assets/ttt_icon.png',
+              height: 50,
+              width: 50,
+            ),
+            applicationName: 'Tic Tac Toe',
+            applicationVersion: '0.0.1',
+            children: <Widget>[
+              Padding(
+                  padding: const EdgeInsets.only(top: 15), child: Text(message))
+            ],
+          );
+        });
   }
 
-  static const String HUMAN_PLAYER = "X";
-  static const String COMPUTER_PLAYER = "O";
+  String gameStatus = "X's Turn";
   static const BOARD_SIZE = 9;
-  bool gameOver = false;
+  var hit = 0;
   var win = 0;
   var turn = 0;
-  List<String> mBoard = ["", "", "", "", "", "", "", "", ""];
-  var rnd = Random();
-  String gameStatus = "X's Turn";
+  var mBoard = ["", "", "", "", "", "", "", "", ""];
+  var rnd = Random(BOARD_SIZE);
+  var mRand = Random();
   int humanScore = 0;
   int computerScore = 0;
   int tieScore = 0;
-  bool _buttonsEnabled =true;
+  late bool gameOver = false;
 
-  @override
-  void initState() {
-    super.initState();
-  }
-
-  void _resetScores() {
-    setState(() {
-      humanScore = 0;
-      computerScore = 0;
-      tieScore = 0;
-    });
-  }
-
-  void checkGameStatus() {
-    int winner = checkForWinner();
-    if (winner != 0) {
-      setState(() {
-        gameOver = true;
-        if (winner == 2) {
-          gameStatus = "$HUMAN_PLAYER wins!";
-          humanScore++;
-        } else if (winner == 3) {
-          gameStatus = "$COMPUTER_PLAYER wins!";
-          computerScore++;
-        } else {
-          gameStatus = "It's a tie.";
-          tieScore++;
-        }
-      });
-    } else {
-      setState(() {
-        gameStatus = turn % 2 == 0 ? "X's Turn" : "O's Turn";
-      });
+bool getWinningMove() {
+  for (int i = 0; i < BOARD_SIZE; i++) {
+    if (mBoard[i] != HUMAN_PLAYER && mBoard[i] != COMPUTER_PLAYER) {
+      var curr = mBoard[i];
+      mBoard[i] = COMPUTER_PLAYER;
+      if (checkForWinner() == 3) {
+        print("Computer is moving to ${i + 1}");
+        return true;
+      } else {
+        mBoard[i] = curr;
+      }
     }
   }
+  return false;
+}
 
-  
-
-  void getComputerMove() {
-    if (gameOver) return;
-
-    for (int i = 0; i < BOARD_SIZE; i++) {
-      if (mBoard[i].isEmpty) {
+bool getBlockingMove() {
+  for (int i = 0; i < BOARD_SIZE; i++) {
+    if (mBoard[i] != HUMAN_PLAYER && mBoard[i] != COMPUTER_PLAYER) {
+      var curr = mBoard[i]; // Save the current value
+      mBoard[i] = HUMAN_PLAYER;
+      if (checkForWinner() == 2) {
         mBoard[i] = COMPUTER_PLAYER;
-        if (checkForWinner() == 3) {
-          setState(() {
-            gameOver = true;
-            gameStatus = "$COMPUTER_PLAYER wins!";
-            computerScore++;
-          });
-          return;
-        } else {
-          mBoard[i] = "";
-        }
+        print("Computer is moving to ${i + 1}");
+        return true;
+      } else {
+        mBoard[i] = curr; // Restore the original value if not a blocking move
       }
-    }
-
-    for (int i = 0; i < BOARD_SIZE; i++) {
-      if (mBoard[i].isEmpty) {
-        mBoard[i] = HUMAN_PLAYER;
-        if (checkForWinner() == 2) {
-          setState(() {
-            mBoard[i] = COMPUTER_PLAYER;
-            gameStatus = "X's Turn";
-          });
-          return;
-        } else {
-          mBoard[i] = "";
-        }
-      }
-    }
-
-    List<int> emptySpots = [];
-    for (int i = 0; i < BOARD_SIZE; i++) {
-      if (mBoard[i].isEmpty) {
-        emptySpots.add(i);
-      }
-    }
-    
-    if (emptySpots.isNotEmpty) {
-      int move = emptySpots[Random().nextInt(emptySpots.length)];
-      
-      setState(() {
-        
-        mBoard[move] = COMPUTER_PLAYER;
-
-        if (checkForWinner() != 3) {
-          gameStatus = "X's Turn";
-        }
-      });
     }
   }
+  return false;
+}
+
+  void getRandomMove() {
+    int move;
+    int holder;
+    do {
+      move = mRand.nextInt(BOARD_SIZE);
+    }
+    //rando
+    while (mBoard[move] == HUMAN_PLAYER || mBoard[move] == COMPUTER_PLAYER);
+    holder = move + 1;
+    print("Computer is moving to " '$holder');
+    mBoard[move] = COMPUTER_PLAYER;
+  }
+
+void getComputerMove() {
+  if (_gameDifficulty == 1) {
+    getRandomMove();
+  } //easy
+  else if (_gameDifficulty == 2) {
+    if (!getWinningMove()) {
+      getRandomMove();
+    }
+  } //med
+  else if (_gameDifficulty == 3) {
+    if (!getWinningMove()) {
+      if (!getBlockingMove()) {
+        getRandomMove();
+      }
+    }
+  } //hard
+}
 
   int checkForWinner() {
+    var replace = mBoard;
     for (int i = 0; i <= 6; i += 3) {
       if (mBoard[i] == HUMAN_PLAYER &&
           mBoard[i + 1] == HUMAN_PLAYER &&
@@ -187,13 +202,73 @@ class HomePageState extends State<HomePage> {
             mBoard[6] == COMPUTER_PLAYER)) return 3;
 
     for (int i = 0; i < BOARD_SIZE; i++) {
-      if (!(mBoard[i] == HUMAN_PLAYER) && !(mBoard[i] == COMPUTER_PLAYER)) {
+      if (!(replace[i] == HUMAN_PLAYER) && !(replace[i] == COMPUTER_PLAYER)) {
         return 0;
       }
     }
 
     return 1;
   }
+
+  void checkGameStatus() {
+    int winner = checkForWinner();
+    if (winner != 0) {
+      setState(() {
+        gameOver = true;
+        if (winner == 2) {
+          gameStatus = "$HUMAN_PLAYER wins!";
+          humanScore++;
+        } else if (winner == 3) {
+          gameStatus = "$COMPUTER_PLAYER wins!";
+          computerScore++;
+        } else {
+          gameStatus = "It's a tie.";
+          tieScore++;
+        }
+      });
+  } else {
+    int moveCount = mBoard.where((cell) => cell.isNotEmpty).length;
+    setState(() {
+      if (moveCount % 2 == 0) {
+        gameStatus = "$HUMAN_PLAYER's Turn";
+      } else {
+        gameStatus = "$COMPUTER_PLAYER's Turn";
+      }
+    });
+  }
+}
+
+  void newGame() {
+    setState(() {
+      _buttonsEnabled = true;
+      mBoard = List.filled(9, "");
+      gameOver = false;
+      win = 0;
+      turn = 0;
+      gameStatus = "X's Turn";
+    });
+  }
+
+  void _resetScores() {
+    setState(() {
+      humanScore = 0;
+      computerScore = 0;
+      tieScore = 0;
+    });
+  }
+
+  // Methods to play sound files
+  playLocalA() async {
+    await playerA.play(AssetSource('sword.mp3'));
+  }
+
+  playLocalB() async {
+    await playerB.play(AssetSource('swish.mp3'));
+  }
+
+  final playerA = AudioPlayer();
+  final playerB = AudioPlayer();
+  bool _buttonsEnabled = true;
 
   void showStatus(int win) {
     ('\n');
@@ -211,228 +286,31 @@ class HomePageState extends State<HomePage> {
     }
   }
 
-  void newGame() {
-    setState(() {
-      _buttonsEnabled = true;
-      mBoard = List.filled(9, "");
-      gameOver = false;
-      win = 0;
-      turn = 0;
-      gameStatus = "X's Turn";
-    });
-  }
+void _buttonX(int index) {
+  if (!_buttonsEnabled || gameOver || mBoard[index].isNotEmpty) return;
 
-  void _button0() {
-    if (!_buttonsEnabled || gameOver || mBoard[0] != "") return;
+  setState(() {
+    mBoard[index] = HUMAN_PLAYER;
+    _buttonsEnabled = false;
+  });
 
+  playLocalA();
+  checkGameStatus();
+
+  if (!gameOver) {
     setState(() {
-      mBoard[0] = HUMAN_PLAYER;
-      
+      // Disable all buttons during the computer's turn
       _buttonsEnabled = false;
     });
 
-    playLocalA();
-
-    checkGameStatus();
-
-  if (!gameOver) {
+    // Use async/await instead of Future.delayed
     Future.delayed(const Duration(milliseconds: 1500), () {
-      getComputerMove();
+       getComputerMove();
       playLocalB();
       setState(() {
-        _buttonsEnabled = true; // Enable the buttons after the computer's move
+        _buttonsEnabled = true;
       });
-    });
-  }
-}
-
-  void _button1() {
-    if (!_buttonsEnabled || gameOver || mBoard[1] != "") return;
-
-    setState(() {
-      mBoard[1] = HUMAN_PLAYER;
-      
-      _buttonsEnabled = false;
-    });
-
-    playLocalA();
-
-    checkGameStatus();
-
-  if (!gameOver) {
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      getComputerMove();
-      playLocalB();
-      setState(() {
-        _buttonsEnabled = true; // Enable the buttons after the computer's move
-      });
-    });
-  }
-}
-
-  void _button2() {
-    if (!_buttonsEnabled || gameOver || mBoard[2] != "") return;
-
-    setState(() {
-      mBoard[2] = HUMAN_PLAYER;
-    
-      _buttonsEnabled = false;
-    });
-
-    playLocalA();
-
-    checkGameStatus();
-
-  if (!gameOver) {
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      getComputerMove();
-      playLocalB();
-      setState(() {
-        _buttonsEnabled = true; // Enable the buttons after the computer's move
-      });
-    });
-  }
-}
-
-  void _button3() {
-    if (!_buttonsEnabled || gameOver || mBoard[3] != "") return;
-
-    setState(() {
-      mBoard[3] = HUMAN_PLAYER;
-      
-      _buttonsEnabled = false;
-    });
-
-    playLocalA();
-
-    checkGameStatus();
-
-  if (!gameOver) {
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      getComputerMove();
-      playLocalB();
-      setState(() {
-        _buttonsEnabled = true; // Enable the buttons after the computer's move
-      });
-    });
-  }
-}
-
-  void _button4() {
-    if (!_buttonsEnabled || gameOver || mBoard[4] != "") return;
-
-    setState(() {
-      mBoard[4] = HUMAN_PLAYER;
-      
-      _buttonsEnabled = false;
-    });
-
-    playLocalA();
-
-    checkGameStatus();
-
-  if (!gameOver) {
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      getComputerMove();
-      playLocalB();
-      setState(() {
-        _buttonsEnabled = true; // Enable the buttons after the computer's move
-      });
-    });
-  }
-}
-
-  void _button5() {
-    if (!_buttonsEnabled || gameOver || mBoard[5] != "") return;
-
-    setState(() {
-      mBoard[5] = HUMAN_PLAYER;
-      
-      _buttonsEnabled = false;
-    });
-
-    playLocalA();
-
-    checkGameStatus();
-
-  if (!gameOver) {
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      getComputerMove();
-      playLocalB();
-      setState(() {
-        _buttonsEnabled = true; // Enable the buttons after the computer's move
-      });
-    });
-  }
-}
-
-  void _button6() {
-    if (!_buttonsEnabled || gameOver || mBoard[6] != "") return;
-
-    setState(() {
-      mBoard[6] = HUMAN_PLAYER;
-      
-      _buttonsEnabled = false;
-    });
-
-    playLocalA();
-
-    checkGameStatus();
-
-  if (!gameOver) {
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      getComputerMove();
-      playLocalB();
-      setState(() {
-        _buttonsEnabled = true; // Enable the buttons after the computer's move
-      });
-    });
-  }
-}
-
-  void _button7() {
-    if (!_buttonsEnabled || gameOver || mBoard[7] != "") return;
-
-    setState(() {
-      mBoard[7] = HUMAN_PLAYER;
-      
-      _buttonsEnabled = false;
-    });
-    playLocalA();
-
-    checkGameStatus();
-
-  if (!gameOver) {
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      getComputerMove();
-      playLocalB();
-      setState(() {
-        _buttonsEnabled = true; // Enable the buttons after the computer's move
-      });
-    });
-  }
-}
-
-  void _button8() {
-    if (!_buttonsEnabled || gameOver || mBoard[8] != "") return;
-
-    setState(() {
-      mBoard[8] = HUMAN_PLAYER;
-      
-      _buttonsEnabled = false;
-    });
-
-    playLocalA();
-
-    checkGameStatus();
-
-  if (!gameOver) {
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      getComputerMove();
-      playLocalB();
-      setState(() {
-        _buttonsEnabled = true; // Enable the buttons after the computer's move
-      });
+      checkGameStatus();
     });
   }
 }
@@ -440,6 +318,96 @@ class HomePageState extends State<HomePage> {
   void displayMessage(String text) {
     text = text;
     (text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+          title:
+              const Text("Tic Tac Toe", style: TextStyle(color: Colors.white)),
+          backgroundColor: Colors.blueAccent,
+          actions: <Widget>[
+            IconButton(
+              icon: const Icon(Icons.new_releases, color: Colors.white),
+              tooltip: 'New Game',
+              onPressed: () {
+                newGame();
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              tooltip: 'Reset Game Scores',
+              onPressed: () {
+                _resetScores();
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.white),
+              tooltip: 'Quit Game',
+              onPressed: () => exit(0),
+            ),
+            PopupMenuButton<int>(
+                onSelected: (result) {
+                  if (result == 1) {
+                    _aboutDialog(
+                        context,
+                        "This is a simple tic-tac-toe game for Android and iOS."
+                        "The buttons represent the game board and a text widget displays the game status."
+                        "Moves are represented by an X for the human player and an O for the computer.");
+                  }
+                  if (result == 2) {
+                    _settings(context, "test2");
+                  }
+                },
+                iconColor: Colors.white,
+                itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 1,
+                        child: Text(
+                          "About",
+                          style: TextStyle(
+                              color: Colors.black, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 2,
+                        child: Text(
+                          "Settings",
+                          style: TextStyle(
+                              color: Colors.black, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ]),
+          ]),
+      floatingActionButton: Builder(builder: (context) {
+        return FloatingActionButton(
+            child: const Icon(Icons.add),
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  backgroundColor: Colors.blueAccent,
+                  content: Text(
+                    _gameDif,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  action: SnackBarAction(
+                    textColor: Colors.white,
+                    label: 'OK',
+                    onPressed: () {},
+                  ),
+                ),
+              );
+            });
+      }),
+      body: OrientationBuilder(
+        builder: (context, orientation) {
+          return orientation == Orientation.portrait
+              ? _buildVerticalLayout()
+              : _buildHorizontalLayout();
+        },
+      ),
+    );
   }
 
   _buildVerticalLayout() {
@@ -460,7 +428,7 @@ class HomePageState extends State<HomePage> {
               color: Colors.teal,
               margin: const EdgeInsets.all(10.0),
               child: ElevatedButton(
-                onPressed: !_buttonsEnabled || gameOver || mBoard[0].isNotEmpty ? null : _button0,
+                onPressed: () => _buttonX(0),
                 style: style.copyWith(
                     backgroundColor: MaterialStateProperty.all(Colors.grey)),
                 child: Text(mBoard[0],
@@ -483,7 +451,7 @@ class HomePageState extends State<HomePage> {
               color: Colors.teal,
               margin: const EdgeInsets.all(10.0),
               child: ElevatedButton(
-                onPressed: !_buttonsEnabled || gameOver || mBoard[1].isNotEmpty ? null : _button1,
+                onPressed: () => _buttonX(1),
                 style: style.copyWith(
                     backgroundColor: MaterialStateProperty.all(Colors.grey)),
                 child: Text(mBoard[1],
@@ -506,7 +474,7 @@ class HomePageState extends State<HomePage> {
               color: Colors.teal,
               margin: const EdgeInsets.all(10.0),
               child: ElevatedButton(
-                onPressed: !_buttonsEnabled || gameOver || mBoard[2].isNotEmpty ? null : _button2,
+                onPressed: () => _buttonX(2),
                 style: style.copyWith(
                     backgroundColor: MaterialStateProperty.all(Colors.grey)),
                 child: Text(mBoard[2],
@@ -531,7 +499,7 @@ class HomePageState extends State<HomePage> {
               color: Colors.teal,
               margin: const EdgeInsets.all(10.0),
               child: ElevatedButton(
-                onPressed: !_buttonsEnabled || gameOver || mBoard[3].isNotEmpty ? null : _button3,
+                onPressed: () => _buttonX(3),
                 style: style.copyWith(
                     backgroundColor: MaterialStateProperty.all(Colors.grey)),
                 child: Text(mBoard[3],
@@ -554,7 +522,7 @@ class HomePageState extends State<HomePage> {
               color: Colors.teal,
               margin: const EdgeInsets.all(10.0),
               child: ElevatedButton(
-                onPressed: !_buttonsEnabled || gameOver || mBoard[4].isNotEmpty ? null : _button4,
+                onPressed: () => _buttonX(4),
                 style: style.copyWith(
                     backgroundColor: MaterialStateProperty.all(Colors.grey)),
                 child: Text(mBoard[4],
@@ -577,7 +545,7 @@ class HomePageState extends State<HomePage> {
               color: Colors.teal,
               margin: const EdgeInsets.all(10.0),
               child: ElevatedButton(
-                onPressed: !_buttonsEnabled || gameOver || mBoard[5].isNotEmpty ? null : _button5,
+                onPressed: () => _buttonX(5),
                 style: style.copyWith(
                     backgroundColor: MaterialStateProperty.all(Colors.grey)),
                 child: Text(mBoard[5],
@@ -602,7 +570,7 @@ class HomePageState extends State<HomePage> {
               color: Colors.teal,
               margin: const EdgeInsets.all(10.0),
               child: ElevatedButton(
-                onPressed: !_buttonsEnabled || gameOver || mBoard[6].isNotEmpty ? null : _button6,
+                onPressed: () => _buttonX(6),
                 style: style.copyWith(
                     backgroundColor: MaterialStateProperty.all(Colors.grey)),
                 child: Text(mBoard[6],
@@ -625,7 +593,7 @@ class HomePageState extends State<HomePage> {
               color: Colors.teal,
               margin: const EdgeInsets.all(10.0),
               child: ElevatedButton(
-                onPressed: !_buttonsEnabled || gameOver || mBoard[7].isNotEmpty ? null : _button7,
+                onPressed: () => _buttonX(7),
                 style: style.copyWith(
                     backgroundColor: MaterialStateProperty.all(Colors.grey)),
                 child: Text(mBoard[7],
@@ -648,7 +616,7 @@ class HomePageState extends State<HomePage> {
               color: Colors.teal,
               margin: const EdgeInsets.all(10.0),
               child: ElevatedButton(
-                onPressed: !_buttonsEnabled || gameOver || mBoard[8].isNotEmpty ? null : _button8,
+                onPressed: () => _buttonX(8),
                 style: style.copyWith(
                     backgroundColor: MaterialStateProperty.all(Colors.grey)),
                 child: Text(mBoard[8],
@@ -748,8 +716,7 @@ class HomePageState extends State<HomePage> {
                       color: Colors.teal,
                       margin: const EdgeInsets.all(10.0),
                       child: ElevatedButton(
-                        onPressed:
-                            !_buttonsEnabled || gameOver || mBoard[0].isNotEmpty ? null : _button0,
+                        onPressed: () => _buttonX(0),
                         style: style.copyWith(
                             backgroundColor:
                                 MaterialStateProperty.all(Colors.grey)),
@@ -773,8 +740,7 @@ class HomePageState extends State<HomePage> {
                       color: Colors.teal,
                       margin: const EdgeInsets.all(10.0),
                       child: ElevatedButton(
-                        onPressed:
-                            !_buttonsEnabled || gameOver || mBoard[1].isNotEmpty ? null : _button1,
+                        onPressed: () => _buttonX(1),
                         style: style.copyWith(
                             backgroundColor:
                                 MaterialStateProperty.all(Colors.grey)),
@@ -798,8 +764,7 @@ class HomePageState extends State<HomePage> {
                       color: Colors.teal,
                       margin: const EdgeInsets.all(10.0),
                       child: ElevatedButton(
-                        onPressed:
-                            !_buttonsEnabled || gameOver || mBoard[2].isNotEmpty ? null : _button2,
+                        onPressed: () => _buttonX(2),
                         style: style.copyWith(
                             backgroundColor:
                                 MaterialStateProperty.all(Colors.grey)),
@@ -827,8 +792,7 @@ class HomePageState extends State<HomePage> {
                       color: Colors.teal,
                       margin: const EdgeInsets.all(10.0),
                       child: ElevatedButton(
-                        onPressed:
-                            !_buttonsEnabled || gameOver || mBoard[3].isNotEmpty ? null : _button3,
+                        onPressed: () => _buttonX(3),
                         style: style.copyWith(
                             backgroundColor:
                                 MaterialStateProperty.all(Colors.grey)),
@@ -852,8 +816,7 @@ class HomePageState extends State<HomePage> {
                       color: Colors.teal,
                       margin: const EdgeInsets.all(10.0),
                       child: ElevatedButton(
-                        onPressed:
-                            !_buttonsEnabled || gameOver || mBoard[4].isNotEmpty ? null : _button4,
+                        onPressed: () => _buttonX(4),
                         style: style.copyWith(
                             backgroundColor:
                                 MaterialStateProperty.all(Colors.grey)),
@@ -877,8 +840,7 @@ class HomePageState extends State<HomePage> {
                       color: Colors.teal,
                       margin: const EdgeInsets.all(10.0),
                       child: ElevatedButton(
-                        onPressed:
-                            !_buttonsEnabled || gameOver || mBoard[5].isNotEmpty ? null : _button5,
+                        onPressed: () => _buttonX(5),
                         style: style.copyWith(
                             backgroundColor:
                                 MaterialStateProperty.all(Colors.grey)),
@@ -906,8 +868,7 @@ class HomePageState extends State<HomePage> {
                       color: Colors.teal,
                       margin: const EdgeInsets.all(10.0),
                       child: ElevatedButton(
-                        onPressed:
-                            !_buttonsEnabled || gameOver || mBoard[6].isNotEmpty ? null : _button6,
+                        onPressed: () => _buttonX(6),
                         style: style.copyWith(
                             backgroundColor:
                                 MaterialStateProperty.all(Colors.grey)),
@@ -931,8 +892,7 @@ class HomePageState extends State<HomePage> {
                       color: Colors.teal,
                       margin: const EdgeInsets.all(10.0),
                       child: ElevatedButton(
-                        onPressed:
-                            !_buttonsEnabled || gameOver || mBoard[7].isNotEmpty ? null : _button7,
+                        onPressed: () => _buttonX(7),
                         style: style.copyWith(
                             backgroundColor:
                                 MaterialStateProperty.all(Colors.grey)),
@@ -956,8 +916,7 @@ class HomePageState extends State<HomePage> {
                       color: Colors.teal,
                       margin: const EdgeInsets.all(10.0),
                       child: ElevatedButton(
-                        onPressed:
-                            !_buttonsEnabled || gameOver || mBoard[8].isNotEmpty ? null : _button8,
+                        onPressed: () => _buttonX(8),
                         style: style.copyWith(
                             backgroundColor:
                                 MaterialStateProperty.all(Colors.grey)),
@@ -1034,75 +993,6 @@ class HomePageState extends State<HomePage> {
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Tic Tac Toe", style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.blueAccent,
-        actions: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.new_releases, color: Colors.white),
-            tooltip: 'New Game',
-            onPressed: () {
-              newGame();
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            tooltip: 'Reset Game Scores',
-            onPressed: () {
-              _resetScores();
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.close, color: Colors.white),
-            tooltip: 'Quit Game',
-            onPressed: () => exit(0),
-          ),
-          PopupMenuButton<int>(
-            icon: const Icon(Icons.more_vert, color: Colors.white),
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 1,
-                child: TextButton(
-                  onPressed: null,
-                  child: Text(
-                    'About',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                ),
-              ),
-              const PopupMenuItem(
-                value: 2,
-                child: TextButton(
-                  onPressed: null,
-                  child: Text(
-                    'Settings',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                ),
-              )
-            ],
-          )
-        ],
-      ),
-      body: OrientationBuilder(
-        builder: (context, orientation) {
-          return orientation == Orientation.portrait
-              ? _buildVerticalLayout()
-              : _buildHorizontalLayout();
-        },
       ),
     );
   }
